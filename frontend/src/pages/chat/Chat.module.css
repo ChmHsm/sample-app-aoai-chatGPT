@@ -87,7 +87,7 @@
 .chatMessageUserMessage {
   display: flex;
   padding: 20px;
-  background: #edf5fd;
+  background: #FFEFDF;
   border-radius: 8px;
   box-shadow:
     0px 2px 4px rgba(0, 0, 0, 0.14),

@@ -11,6 +11,7 @@ import DOMPurify from 'dompurify'
 
 import styles from './Chat.module.css'
 import Contoso from '../../assets/Contoso.svg'
+import TdraIcon from '../../assets/TdraIcon.svg'
 import { XSSAllowTags } from '../../constants/xssAllowTags'
 
 import {
@@ -751,7 +752,7 @@ const Chat = () => {
           <div className={styles.chatContainer}>
             {!messages || messages.length < 1 ? (
               <Stack className={styles.chatEmptyState}>
-                <img src={ui?.chat_logo ? ui.chat_logo : Contoso} className={styles.chatIcon} aria-hidden="true" />
+                <img src={ui?.chat_logo ? ui.chat_logo : TdraIcon} className={styles.chatIcon} aria-hidden="true" />
                 <h1 className={styles.chatEmptyStateTitle}>{ui?.chat_title}</h1>
                 <h2 className={styles.chatEmptyStateSubtitle}>{ui?.chat_description}</h2>
               </Stack>
@@ -835,7 +836,7 @@ const Chat = () => {
                       root: {
                         color: '#FFFFFF',
                         background:
-                          'radial-gradient(109.81% 107.82% at 100.1% 90.19%, #0F6CBD 33.63%, #2D87C3 70.31%, #8DDDD8 100%)'
+                          'radial-gradient(109.81% 107.82% at 100.1% 90.19%, #FFEFDF 33.63%, #D7B48F 70.31%, #FFEFDF 100%)'
                       },
                       rootDisabled: {
                         background: '#F0F0F0'
@@ -848,6 +849,7 @@ const Chat = () => {
                     aria-label="start a new chat button"
                   />
                 )}
+                
                 <CommandBarButton
                   role="button"
                   styles={{
@@ -860,7 +862,7 @@ const Chat = () => {
                     root: {
                       color: '#FFFFFF',
                       background:
-                        'radial-gradient(109.81% 107.82% at 100.1% 90.19%, #0F6CBD 33.63%, #2D87C3 70.31%, #8DDDD8 100%)'
+                        'radial-gradient(109.81% 107.82% at 100.1% 90.19%, #FFEFDF  33.63%, #D7B48F 70.31%, #FFEFDF 100%)'
                     },
                     rootDisabled: {
                       background: '#F0F0F0'
@@ -886,9 +888,41 @@ const Chat = () => {
                   dialogContentProps={errorDialogContentProps}
                   modalProps={modalProps}></Dialog>
               </Stack>
+              <CommandBarButton
+                  role="button"
+                  styles={{
+                    icon: {
+                      color: '#FFFFFF'
+                    },
+                    iconDisabled: {
+                      color: '#BDBDBD !important'
+                    },
+                    root: {
+                      color: '#FFFFFF',
+                      background:
+                        'radial-gradient(109.81% 107.82% at 100.1% 90.19%, #FFEFDF  33.63%, #D7B48F 70.31%, #FFEFDF 100%)'
+                    },
+                    rootDisabled: {
+                      background: '#F0F0F0'
+                    }
+                  }}
+                  className={
+                    appStateContext?.state.isCosmosDBAvailable?.status !== CosmosDBStatus.NotConfigured
+                      ? styles.clearChatBroom
+                      : styles.clearChatBroomNoCosmos
+                  }
+                  iconProps={{ iconName: 'Broom' }}
+                  onClick={
+                    appStateContext?.state.isCosmosDBAvailable?.status !== CosmosDBStatus.NotConfigured
+                      ? clearChat
+                      : newChat
+                  }
+                  disabled={disabledButton()}
+                  aria-label="clear chat button"
+                />
               <QuestionInput
                 clearOnSend
-                placeholder="Type a new question..."
+                placeholder="Type or attach you message..."
                 disabled={isLoading}
                 onSend={(question, id) => {
                   appStateContext?.state.isCosmosDBAvailable?.cosmosDB
