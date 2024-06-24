@@ -779,7 +779,6 @@ def prepare_model_args(request_body, request_headers):
     # conversation_id = request_body.get('conversation_id', None)
     # if conversation_id is None:
     #     conversation_id = request_body['history_metadata']['conversation_id']
-    print(f"Messages array {request_messages}")
 
     messages = []
     if not SHOULD_USE_DATA:
