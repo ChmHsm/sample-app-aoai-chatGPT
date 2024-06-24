@@ -5,13 +5,17 @@ import logging
 import uuid
 import time
 import asyncio
+import pdb
 from dotenv import load_dotenv
 import httpx
 from azure.storage.blob import BlobServiceClient
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from azure.search.documents.indexes.aio import SearchIndexerClient
-
+from backend.settings import (
+    app_settings,
+    MINIMUM_SUPPORTED_AZURE_OPENAI_PREVIEW_API_VERSION
+)
 from quart import (
     abort,
     Blueprint,
@@ -408,23 +412,23 @@ def init_openai_client(use_data=SHOULD_USE_DATA):
 
 def init_cosmosdb_client():
     cosmos_conversation_client = None
-    if CHAT_HISTORY_ENABLED:
+    if app_settings.chat_history:
         try:
             cosmos_endpoint = (
-                f"https://{AZURE_COSMOSDB_ACCOUNT}.documents.azure.com:443/"
+                f"https://{app_settings.chat_history.account}.documents.azure.com:443/"
             )
 
-            if not AZURE_COSMOSDB_ACCOUNT_KEY:
+            if not app_settings.chat_history.account_key:
                 credential = DefaultAzureCredential()
             else:
-                credential = AZURE_COSMOSDB_ACCOUNT_KEY
+                credential = app_settings.chat_history.account_key
 
             cosmos_conversation_client = CosmosConversationClient(
                 cosmosdb_endpoint=cosmos_endpoint,
                 credential=credential,
-                database_name=AZURE_COSMOSDB_DATABASE,
-                container_name=AZURE_COSMOSDB_CONVERSATIONS_CONTAINER,
-                enable_message_feedback=AZURE_COSMOSDB_ENABLE_FEEDBACK,
+                database_name=app_settings.chat_history.database,
+                container_name=app_settings.chat_history.conversations_container,
+                enable_message_feedback=app_settings.chat_history.enable_feedback,
             )
         except Exception as e:
             logging.exception("Exception in CosmosDB initialization", e)
@@ -434,7 +438,6 @@ def init_cosmosdb_client():
         logging.debug("CosmosDB not configured")
 
     return cosmos_conversation_client
-
 
 def get_configured_data_source(conversation_id):
     data_source = {}
@@ -773,17 +776,22 @@ def get_configured_data_source(conversation_id):
 
 def prepare_model_args(request_body, request_headers):
     request_messages = request_body.get("messages", [])
-    conversation_id = request_body.get('conversation_id', None)
-    if conversation_id is None:
-        conversation_id = request_body['history_metadata']['conversation_id']
+    # conversation_id = request_body.get('conversation_id', None)
+    # if conversation_id is None:
+    #     conversation_id = request_body['history_metadata']['conversation_id']
+    print(f"Messages array {request_messages}")
 
     messages = []
     if not SHOULD_USE_DATA:
         messages = [{"role": "system", "content": AZURE_OPENAI_SYSTEM_MESSAGE}]
-
+    content_list = []
     for message in request_messages:
-        if message:
-            messages.append({"role": message["role"], "content": message["content"]})
+        if message and message["content"]:
+            if message.get("type") and message.get("type") == "img":
+                content_list.append({"type": "image_url", "image_url": {"url": message['content']} })
+            else:
+                content_list.append({"type": "text", "text": message['content']})
+    messages.append({"role": message["role"], "content": content_list})
 
     user_json = None
     if (MS_DEFENDER_ENABLED):
@@ -988,7 +996,7 @@ async def conversation():
     if not request.is_json:
         return jsonify({"error": "request must be json"}), 415
     request_json = await request.get_json()
-
+    print(f"request_json {request_json}")
     return await conversation_internal(request_json, request.headers)
 
 
@@ -1066,6 +1074,8 @@ async def upload_document():
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user['user_principal_id']
     files = await request.files
+    form = await request.form
+    logging.debug('request_form_after_restart')
     
     file = files.get('file')
     filename = ''

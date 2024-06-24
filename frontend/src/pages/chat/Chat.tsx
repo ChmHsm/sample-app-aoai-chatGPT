@@ -588,12 +588,39 @@ const Chat = () => {
     setIsAnalyzing(isIndexing)
   }
 
-  const handleConversationIdUpdate = (conversationId: string, filename: string) => {
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = () => {
+        const base64String = reader.result as string;
+        resolve(base64String);
+      };
+  
+      reader.onerror = (error) => {
+        reject(error);
+      };
+  
+      reader.readAsDataURL(file);
+    });
+  };
+  
+
+  const handleConversationIdUpdate = async (conversationId: string, filename: string, file:File) => {
     // Update the application state/context to switch to the new conversation
     appStateContext?.dispatch({
       type: 'SET_ACTIVE_CONVERSATION_ID',
       payload: conversationId
     })
+
+    let base64File;
+    try {
+      base64File = await fileToBase64(file);
+    } catch (error) {
+      console.error('Error converting file to Base64:', error);
+      return; // Exit the function if there's an error
+    }
+  
 
     setProcessMessages(messageStatus.Processing)
     setIsCitationPanelOpen(false)
@@ -604,7 +631,7 @@ const Chat = () => {
     let resultConversation = appStateContext?.state?.chatHistory?.find(conv => conv.id === conversationId)
 
     let uploadMessages = [
-      { id: uuid().toString(), role: 'user', content: filename, date: today },
+      { id: uuid().toString(), role: 'user', content: base64File, date: today, type:'img' },
       {
         id: uuid().toString(),
         role: 'assistant',

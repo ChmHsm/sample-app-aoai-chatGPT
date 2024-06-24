@@ -21,7 +21,7 @@ interface Props {
   placeholder?: string
   clearOnSend?: boolean
   conversationId?: string
-  onConversationIdUpdate?: (newConversationId: string, filename: string) => void
+  onConversationIdUpdate?: (newConversationId: string, filename: string, file:File) => void
   onDocumentIndexing?: (isIndexing: boolean) => void
   onDocumentUploading?: (isUploading: boolean) => void
 }
@@ -30,7 +30,7 @@ interface UploadSpinnerProps {
   documentUploaded: boolean
   setDocumentUploaded: React.Dispatch<React.SetStateAction<boolean>>
   onUploadStatusChange: (isUploading: boolean) => void
-  onUploadSuccess: (conversationId: string, indexId: string, fileName: string) => void
+  onUploadSuccess: (conversationId: string, indexId: string, fileName: string, file:any) => void
 }
 
 const UploadSpinner: React.FC<UploadSpinnerProps> = ({
@@ -62,7 +62,8 @@ const UploadSpinner: React.FC<UploadSpinnerProps> = ({
         onUploadSuccess(
           item.uploadResponse.data.conversation_id,
           item.uploadResponse.data.index_id,
-          item.uploadResponse.data.document_name
+          item.uploadResponse.data.document_name,
+          item.file
         ) // Invoke the callback with the conversationId
       }
     }
@@ -144,9 +145,9 @@ export const QuestionInput = ({
   }, [disabled, question, clearOnSend, indexId, onDocumentIndexing, conversationId, onSend])
 
   const handleUploadSuccess = useCallback(
-    (newConversationId: string, uniqueId: string, filename: string) => {
+    (newConversationId: string, uniqueId: string, filename: string, file:File) => {
       if (onConversationIdUpdate && newConversationId !== null) {
-        onConversationIdUpdate(newConversationId, filename)
+        onConversationIdUpdate(newConversationId, filename, file)
         setIndexId(uniqueId)
       }
     },

@@ -30,7 +30,8 @@ export type ChatMessage = {
   end_turn?: boolean
   date: string
   feedback?: Feedback
-  context?: string
+  context?: string,
+  type?: string
 }
 
 export type Conversation = {
