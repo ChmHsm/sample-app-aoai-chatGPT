@@ -5,6 +5,9 @@
   gap: 20px;
 }
 
+.chatImg {
+  width: 250px;
+}
 .chatRoot {
   flex: 1;
   display: flex;

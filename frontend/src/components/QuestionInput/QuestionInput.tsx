@@ -14,6 +14,7 @@ import Spinner from '../common/Spinner'
 import { AppStateContext } from '../../state/AppProvider'
 import { indexDocument, indexStatus, frontendSettings, FrontendSettings } from '../../api'
 import { FormEncType } from 'react-router-dom'
+import uuid from 'react-uuid'
 
 interface Props {
   onSend: (question: string, id?: string) => void
@@ -111,6 +112,7 @@ export const QuestionInput = ({
   // });
 
   const sendQuestion = useCallback(async () => {
+    debugger;
     if (disabled || !question.trim()) {
       return
     }
@@ -205,46 +207,86 @@ export const QuestionInput = ({
     ))
   )
 
-  return (
-    <Uploady destination={uploadDestination} fileFilter={fileSizeOk} params={{ conversationId: conversationId }}>
-      <UploadDropZone onDragOverClassName="drag-over" grouped maxGroupSize={3}>
-        <Stack horizontal className={styles.questionInputContainer}>
-          <TextField
-            className={styles.questionInputTextArea}
-            placeholder={placeholder}
-            multiline
-            resizable={false}
-            borderless
-            value={question}
-            onChange={onQuestionChange}
-            onKeyDown={onEnterPress}
-          />
+  const handleFileChange = (event:any) => {
+    const file = event.target.files[0];
+    if (file) {
+      console.log(file);
+      if (onConversationIdUpdate) {
+        onConversationIdUpdate(uuid(), file.name, file)
+  
+      }
 
-          <Stack horizontal className={styles.questionInputActionsContainer}>
-            <UploadWidget />
-            {error && <span className={styles.error}>{error}</span>}
-            <UploadSpinner
-              documentUploaded={documentUploaded}
-              setDocumentUploaded={setDocumentUploaded}
-              onUploadSuccess={handleUploadSuccess}
-              onUploadStatusChange={handleUploadStatusChange}
-            />
-            <div
-              className={styles.questionInputSendButtonContainer}
-              role="button"
-              tabIndex={0}
-              aria-label="Ask question button"
-              onClick={sendQuestion}
-              onKeyDown={e => (e.key === 'Enter' || e.key === ' ' ? sendQuestion() : null)}>
-              {sendQuestionDisabled ? (
-                <SendRegular className={styles.questionInputSendButtonDisabled} />
-              ) : (
-                <img src={Send} className={styles.questionInputSendButton} />
-              )}
-            </div>
-          </Stack>
-        </Stack>
-      </UploadDropZone>
-    </Uploady>
+    }
+  };
+
+  return (
+    // <Uploady destination={uploadDestination} fileFilter={fileSizeOk} params={{ conversationId: conversationId }}>
+    //     <Stack horizontal className={styles.questionInputContainer}>
+    //       <TextField
+    //         className={styles.questionInputTextArea}
+    //         placeholder={placeholder}
+    //         multiline
+    //         resizable={false}
+    //         borderless
+    //         value={question}
+    //         onChange={onQuestionChange}
+    //         onKeyDown={onEnterPress}
+    //       />
+
+    //       <Stack horizontal className={styles.questionInputActionsContainer}>
+    //         <UploadWidget />
+    //         {error && <span className={styles.error}>{error}</span>}
+    //         <UploadSpinner
+    //           documentUploaded={documentUploaded}
+    //           setDocumentUploaded={setDocumentUploaded}
+    //           onUploadSuccess={handleUploadSuccess}
+    //           onUploadStatusChange={handleUploadStatusChange}
+    //         />
+    //         <div
+    //           className={styles.questionInputSendButtonContainer}
+    //           role="button"
+    //           tabIndex={0}
+    //           aria-label="Ask question button"
+    //           onClick={sendQuestion}
+    //           onKeyDown={e => (e.key === 'Enter' || e.key === ' ' ? sendQuestion() : null)}>
+    //           {sendQuestionDisabled ? (
+    //             <SendRegular className={styles.questionInputSendButtonDisabled} />
+    //           ) : (
+    //             <img src={Send} className={styles.questionInputSendButton} />
+    //           )}
+    //         </div>
+    //       </Stack>
+    //     </Stack>
+    // </Uploady>
+    <Stack horizontal className={styles.questionInputContainer}>
+    <TextField
+      className={styles.questionInputTextArea}
+      placeholder="Type your question here"
+      multiline
+      resizable={false}
+      borderless
+      value={question}
+      onChange={onQuestionChange}
+      onKeyDown={onEnterPress}
+    />
+    <Stack horizontal className={styles.questionInputActionsContainer}>
+      <input type="file" onChange={handleFileChange} />
+      {error && <span className={styles.error}>{error}</span>}
+      <div
+        className={styles.questionInputSendButtonContainer}
+        role="button"
+        tabIndex={0}
+        aria-label="Ask question button"
+        onClick={sendQuestion}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ' ? sendQuestion() : null)}
+      >
+        {sendQuestionDisabled ? (
+          <SendRegular className={styles.questionInputSendButtonDisabled} />
+        ) : (
+          <img src={Send} className={styles.questionInputSendButton} />
+        )}
+      </div>
+    </Stack>
+  </Stack>
   )
 }
