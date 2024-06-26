@@ -50,7 +50,9 @@ export type ChatMessage = {
   end_turn?: boolean
   date: string
   feedback?: Feedback
-  context?: string
+  context?: string,
+  type?: string,
+  imgUrl?:string
 }
 
 export type Conversation = {
@@ -137,6 +139,8 @@ export type FrontendSettings = {
   feedback_enabled?: string | null
   ui?: UI
   sanitize_answer?: boolean
+  polling_interval?: number
+  upload_max_filesize?: number
 }
 
 export enum Feedback {

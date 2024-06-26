@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useContext, useLayoutEffect } from 'react'
-import { CommandBarButton, IconButton, Dialog, DialogType, Stack } from '@fluentui/react'
+import { CommandBarButton, IconButton, Dialog, DialogType, Stack, Spinner } from '@fluentui/react'
 import { SquareRegular, ShieldLockRegular, ErrorCircleRegular } from '@fluentui/react-icons'
 
 import ReactMarkdown from 'react-markdown'
@@ -41,6 +41,8 @@ import { useBoolean } from "@fluentui/react-hooks";
 const enum messageStatus {
   NotRunning = 'Not Running',
   Processing = 'Processing',
+  Uploading = 'Uploading Document...',
+  Analyzing = 'Analyzing Document...',
   Done = 'Done'
 }
 
@@ -60,6 +62,8 @@ const Chat = () => {
   const [clearingChat, setClearingChat] = useState<boolean>(false)
   const [hideErrorDialog, { toggle: toggleErrorDialog }] = useBoolean(true)
   const [errorMsg, setErrorMsg] = useState<ErrorMessage | null>()
+  const [showAnalyzingMessage, setIsAnalyzing] = useState<boolean>(false)
+  const [showUploadingMessage, setIsUploading] = useState<boolean>(false)
 
   const errorDialogContentProps = {
     type: DialogType.close,
@@ -151,17 +155,24 @@ const Chat = () => {
     }
   }
 
-  const makeApiRequestWithoutCosmosDB = async (question: string, conversationId?: string) => {
+  const makeApiRequestWithoutCosmosDB = async (question: any, conversationId?: string) => {
+    debugger;
     setIsLoading(true)
     setShowLoadingMessage(true)
     const abortController = new AbortController()
     abortFuncs.current.unshift(abortController)
 
-    const userMessage: ChatMessage = {
-      id: uuid(),
-      role: 'user',
-      content: question,
-      date: new Date().toISOString()
+
+    let userMessage: ChatMessage;
+    if(typeof question !== 'string') {
+       userMessage = question
+    } else {
+       userMessage = {
+        id: uuid(),
+        role: 'user',
+        content: question,
+        date: new Date().toISOString()
+      }
     }
 
     let conversation: Conversation | null | undefined
@@ -175,13 +186,22 @@ const Chat = () => {
     } else {
       conversation = appStateContext?.state?.currentChat
       if (!conversation) {
-        console.error('Conversation not found.')
-        setIsLoading(false)
-        setShowLoadingMessage(false)
-        abortFuncs.current = abortFuncs.current.filter(a => a !== abortController)
-        return
-      } else {
-        conversation.messages.push(userMessage)
+        // console.error('Conversation not found.')
+        // setIsLoading(false)
+        // setShowLoadingMessage(false)
+        // abortFuncs.current = abortFuncs.current.filter(a => a !== abortController)
+        // return
+        conversation = {
+          id: conversationId ?? uuid(),
+          title: question,
+          messages: [userMessage],
+          date: new Date().toISOString()
+        }
+        if(typeof question === 'string') { 
+          conversation.messages.push(userMessage)
+        }
+        } else {
+          conversation.messages.push(userMessage)
       }
     }
 
@@ -276,6 +296,7 @@ const Chat = () => {
   }
 
   const makeApiRequestWithCosmosDB = async (question: string, conversationId?: string) => {
+    debugger;
     setIsLoading(true)
     setShowLoadingMessage(true)
     const abortController = new AbortController()
@@ -525,7 +546,6 @@ const Chat = () => {
     }
     setClearingChat(false)
   }
-
   const tryGetRaiPrettyError = (errorMessage: string) => {
     try {
       // Using a regex to extract the JSON part that contains "innererror"
@@ -579,6 +599,90 @@ const Chat = () => {
     }
 
     return tryGetRaiPrettyError(errorMessage)
+  }
+
+  const onDocumentUploading = (isUploading: boolean) => {
+    setIsUploading(isUploading)
+  }
+  const onDocumentIndexing = (isIndexing: boolean) => {
+    setIsAnalyzing(isIndexing)
+  }
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = () => {
+        const base64String = reader.result as string;
+        resolve(base64String);
+      };
+  
+      reader.onerror = (error) => {
+        reject(error);
+      };
+  
+      reader.readAsDataURL(file);
+    });
+  };
+  
+
+  const handleConversationIdUpdate = async (conversationId: string, filename: string, file:File) => {
+    debugger;
+    // Update the application state/context to switch to the new conversation
+    appStateContext?.dispatch({
+      type: 'SET_ACTIVE_CONVERSATION_ID',
+      payload: conversationId
+    })
+
+    let base64File;
+    let imgUrl;
+    try {
+      base64File = await fileToBase64(file);
+      imgUrl = URL.createObjectURL(file)
+
+    } catch (error) {
+      console.error('Error converting file to Base64:', error);
+      return; // Exit the function if there's an error
+    }
+  
+
+    setProcessMessages(messageStatus.Processing)
+    setIsCitationPanelOpen(false)
+    setActiveCitation(undefined)
+
+    var today = new Date().toISOString()
+
+    let resultConversation = appStateContext?.state?.chatHistory?.find(conv => conv.id === conversationId)
+
+    let uploadMessages = [
+      { id: uuid().toString(), role: 'user', content: base64File, date: today, type:'img', imgUrl:imgUrl },
+      // {
+      //   id: uuid().toString(),
+      //   role: 'assistant',
+      //   content: 'Your document was successfully uploaded. Please ask a question to begin analysis.',
+      //   date: today
+      // }
+    ]
+
+    if (resultConversation) {
+      debugger;
+      uploadMessages.forEach(msg => {
+        resultConversation?.messages.push(msg)
+      })
+      appStateContext?.dispatch({ type: 'UPDATE_CURRENT_CHAT', payload: resultConversation })
+    } else {
+      appStateContext?.dispatch({
+        type: 'UPDATE_CURRENT_CHAT',
+        payload: {
+          id: conversationId,
+          title: 'New Document Chat',
+          messages: uploadMessages,
+          date: today
+        }
+      })
+    }
+    makeApiRequestWithoutCosmosDB(uploadMessages[0], conversationId)
+    setProcessMessages(messageStatus.Done)
   }
 
   const newChat = () => {
@@ -762,7 +866,10 @@ const Chat = () => {
                   <>
                     {answer.role === 'user' ? (
                       <div className={styles.chatMessageUser} tabIndex={0}>
+                      {
+                        answer?.type && answer.type === 'img' ? <img className={styles.chatImg} src={answer.imgUrl} /> : 
                         <div className={styles.chatMessageUserMessage}>{answer.content}</div>
+                      }
                       </div>
                     ) : answer.role === 'assistant' ? (
                       <div className={styles.chatMessageGpt}>
@@ -788,6 +895,22 @@ const Chat = () => {
                     ) : null}
                   </>
                 ))}
+                {(showAnalyzingMessage || showUploadingMessage) && (
+                  <div className={styles.chatMessageUser}>
+                    <div className={styles.chatMessageUserMessage}>
+                      <Spinner />
+                      <Answer
+                        role="user"
+                        answer={{
+                          answer: showAnalyzingMessage ? messageStatus.Analyzing : messageStatus.Uploading,
+                          citations: [],
+                          plotly_data: null
+                        }}
+                        onCitationClicked={() => null}
+                      />
+                    </div>
+                  </div>
+                )}
                 {showLoadingMessage && (
                   <>
                     <div className={styles.chatMessageGpt}>
@@ -929,6 +1052,9 @@ const Chat = () => {
                     ? makeApiRequestWithCosmosDB(question, id)
                     : makeApiRequestWithoutCosmosDB(question, id)
                 }}
+                onConversationIdUpdate={handleConversationIdUpdate}
+                onDocumentIndexing={onDocumentIndexing}
+                onDocumentUploading={onDocumentUploading}
                 conversationId={
                   appStateContext?.state.currentChat?.id ? appStateContext?.state.currentChat?.id : undefined
                 }
