@@ -28,11 +28,17 @@ from quart import (
 )
 
 from openai import AsyncAzureOpenAI
-from azure.identity.aio import DefaultAzureCredential, get_bearer_token_provider
+from azure.identity.aio import (
+    DefaultAzureCredential,
+    get_bearer_token_provider
+)
 from backend.auth.auth_utils import get_authenticated_user_details
 from backend.security.ms_defender_utils import get_msdefender_user_json
 from backend.history.cosmosdbservice import CosmosConversationClient
-
+from backend.settings import (
+    app_settings,
+    MINIMUM_SUPPORTED_AZURE_OPENAI_PREVIEW_API_VERSION
+)
 from backend.utils import (
     format_as_ndjson,
     format_stream_response,
@@ -76,7 +82,11 @@ def create_app():
 
 @bp.route("/")
 async def index():
-    return await render_template("index.html", title=UI_TITLE, favicon=UI_FAVICON)
+    return await render_template(
+        "index.html",
+        title=app_settings.ui.title,
+        favicon=app_settings.ui.favicon
+    )
 
 
 @bp.route("/favicon.ico")
@@ -96,11 +106,6 @@ if DEBUG.lower() == "true":
 
 USER_AGENT = "GitHubSampleWebApp/AsyncAzureOpenAI/1.0.0"
 
-# On Your Data Settings
-DATASOURCE_TYPE = os.environ.get("DATASOURCE_TYPE", "AzureCognitiveSearch")
-SEARCH_TOP_K = os.environ.get("SEARCH_TOP_K", 5)
-SEARCH_STRICTNESS = os.environ.get("SEARCH_STRICTNESS", 3)
-SEARCH_ENABLE_IN_DOMAIN = os.environ.get("SEARCH_ENABLE_IN_DOMAIN", "true")
 
 # ACS Integration Settings
 AZURE_SEARCH_SERVICE = os.environ.get("AZURE_SEARCH_SERVICE")
@@ -296,9 +301,13 @@ def docupload_enabled():
 DOCUPLOAD_ENABLED = docupload_enabled()
 
 
+# Frontend Settings via Environment Variables
 frontend_settings = {
-    "auth_enabled": AUTH_ENABLED,
-    "feedback_enabled": AZURE_COSMOSDB_ENABLE_FEEDBACK and CHAT_HISTORY_ENABLED,
+    "auth_enabled": app_settings.base_settings.auth_enabled,
+    "feedback_enabled": (
+        app_settings.chat_history and
+        app_settings.chat_history.enable_feedback
+    ),
     "ui": {
         "title": UI_TITLE,
         "logo": UI_LOGO,
@@ -312,74 +321,42 @@ frontend_settings = {
     "polling_interval": DOCUPLOAD_INDEX_POLLING_INTERVAL,
     "upload_max_filesize": DOCUPLOAD_MAX_SIZE_MB,
 }
+
+
 # Enable Microsoft Defender for Cloud Integration
 MS_DEFENDER_ENABLED = os.environ.get("MS_DEFENDER_ENABLED", "true").lower() == "true"
 
-def should_use_data():
-    global DATASOURCE_TYPE
-    if AZURE_SEARCH_SERVICE and AZURE_SEARCH_INDEX:
-        DATASOURCE_TYPE = "AzureCognitiveSearch"
-        logging.debug("Using Azure Cognitive Search")
-        return True
-
-    if (
-        AZURE_COSMOSDB_MONGO_VCORE_DATABASE
-        and AZURE_COSMOSDB_MONGO_VCORE_CONTAINER
-        and AZURE_COSMOSDB_MONGO_VCORE_INDEX
-        and AZURE_COSMOSDB_MONGO_VCORE_CONNECTION_STRING
-    ):
-        DATASOURCE_TYPE = "AzureCosmosDB"
-        logging.debug("Using Azure CosmosDB Mongo vcore")
-        return True
-
-    if ELASTICSEARCH_ENDPOINT and ELASTICSEARCH_ENCODED_API_KEY and ELASTICSEARCH_INDEX:
-        DATASOURCE_TYPE = "Elasticsearch"
-        logging.debug("Using Elasticsearch")
-        return True
-
-    if PINECONE_ENVIRONMENT and PINECONE_API_KEY and PINECONE_INDEX_NAME:
-        DATASOURCE_TYPE = "Pinecone"
-        logging.debug("Using Pinecone")
-        return True
-
-    if AZURE_MLINDEX_NAME and AZURE_MLINDEX_VERSION and AZURE_ML_PROJECT_RESOURCE_ID:
-        DATASOURCE_TYPE = "AzureMLIndex"
-        logging.debug("Using Azure ML Index")
-        return True
-
-    return False
-
-
-SHOULD_USE_DATA = should_use_data()
-
 
 # Initialize Azure OpenAI Client
-def init_openai_client(use_data=SHOULD_USE_DATA):
+def init_openai_client():
     azure_openai_client = None
     try:
         # API version check
         if (
-            AZURE_OPENAI_PREVIEW_API_VERSION
+            app_settings.azure_openai.preview_api_version
             < MINIMUM_SUPPORTED_AZURE_OPENAI_PREVIEW_API_VERSION
         ):
-            raise Exception(
+            raise ValueError(
                 f"The minimum supported Azure OpenAI preview API version is '{MINIMUM_SUPPORTED_AZURE_OPENAI_PREVIEW_API_VERSION}'"
             )
 
         # Endpoint
-        if not AZURE_OPENAI_ENDPOINT and not AZURE_OPENAI_RESOURCE:
-            raise Exception(
+        if (
+            not app_settings.azure_openai.endpoint and
+            not app_settings.azure_openai.resource
+        ):
+            raise ValueError(
                 "AZURE_OPENAI_ENDPOINT or AZURE_OPENAI_RESOURCE is required"
             )
 
         endpoint = (
-            AZURE_OPENAI_ENDPOINT
-            if AZURE_OPENAI_ENDPOINT
-            else f"https://{AZURE_OPENAI_RESOURCE}.openai.azure.com/"
+            app_settings.azure_openai.endpoint
+            if app_settings.azure_openai.endpoint
+            else f"https://{app_settings.azure_openai.resource}.openai.azure.com/"
         )
 
         # Authentication
-        aoai_api_key = AZURE_OPENAI_KEY
+        aoai_api_key = app_settings.azure_openai.key
         ad_token_provider = None
         if not aoai_api_key:
             logging.debug("No AZURE_OPENAI_KEY found, using Azure AD auth")
@@ -388,15 +365,15 @@ def init_openai_client(use_data=SHOULD_USE_DATA):
             )
 
         # Deployment
-        deployment = AZURE_OPENAI_MODEL
+        deployment = app_settings.azure_openai.model
         if not deployment:
-            raise Exception("AZURE_OPENAI_MODEL is required")
+            raise ValueError("AZURE_OPENAI_MODEL is required")
 
         # Default Headers
         default_headers = {"x-ms-useragent": USER_AGENT}
 
         azure_openai_client = AsyncAzureOpenAI(
-            api_version=AZURE_OPENAI_PREVIEW_API_VERSION,
+            api_version=app_settings.azure_openai.preview_api_version,
             api_key=aoai_api_key,
             azure_ad_token_provider=ad_token_provider,
             default_headers=default_headers,
@@ -800,17 +777,13 @@ def prepare_model_args(request_body, request_headers):
 
     model_args = {
         "messages": messages,
-        "temperature": float(AZURE_OPENAI_TEMPERATURE),
-        "max_tokens": int(AZURE_OPENAI_MAX_TOKENS),
-        "top_p": float(AZURE_OPENAI_TOP_P),
-        "stop": (
-            parse_multi_columns(AZURE_OPENAI_STOP_SEQUENCE)
-            if AZURE_OPENAI_STOP_SEQUENCE
-            else None
-        ),
-        "stream": SHOULD_STREAM,
-        "model": AZURE_OPENAI_MODEL,
-        "user": user_json,
+        "temperature": app_settings.azure_openai.temperature,
+        "max_tokens": app_settings.azure_openai.max_tokens,
+        "top_p": app_settings.azure_openai.top_p,
+        "stop": app_settings.azure_openai.stop_sequence,
+        "stream": app_settings.azure_openai.stream,
+        "model": app_settings.azure_openai.model,
+        "user": user_json
     }
 
     if SHOULD_USE_DATA:
@@ -859,24 +832,24 @@ async def promptflow_request(request):
     try:
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {PROMPTFLOW_API_KEY}",
+            "Authorization": f"Bearer {app_settings.promptflow.api_key}",
         }
         # Adding timeout for scenarios where response takes longer to come back
-        logging.debug(f"Setting timeout to {PROMPTFLOW_RESPONSE_TIMEOUT}")
+        logging.debug(f"Setting timeout to {app_settings.promptflow.response_timeout}")
         async with httpx.AsyncClient(
-            timeout=float(PROMPTFLOW_RESPONSE_TIMEOUT)
+            timeout=float(app_settings.promptflow.response_timeout)
         ) as client:
             pf_formatted_obj = convert_to_pf_format(
-                request, PROMPTFLOW_REQUEST_FIELD_NAME, PROMPTFLOW_RESPONSE_FIELD_NAME
+                request,
+                app_settings.promptflow.request_field_name,
+                app_settings.promptflow.response_field_name
             )
             # NOTE: This only support question and chat_history parameters
             # If you need to add more parameters, you need to modify the request body
             response = await client.post(
-                PROMPTFLOW_ENDPOINT,
+                app_settings.promptflow.endpoint,
                 json={
-                    f"{PROMPTFLOW_REQUEST_FIELD_NAME}": pf_formatted_obj[-1]["inputs"][
-                        PROMPTFLOW_REQUEST_FIELD_NAME
-                    ],
+                    app_settings.promptflow.request_field_name: pf_formatted_obj[-1]["inputs"][app_settings.promptflow.request_field_name],
                     "chat_history": pf_formatted_obj[:-1],
                 },
                 headers=headers,
@@ -946,11 +919,14 @@ async def send_chat_request(request_body, request_headers):
 
 
 async def complete_chat_request(request_body, request_headers):
-    if USE_PROMPTFLOW and PROMPTFLOW_ENDPOINT and PROMPTFLOW_API_KEY:
+    if app_settings.base_settings.use_promptflow:
         response = await promptflow_request(request_body)
         history_metadata = request_body.get("history_metadata", {})
         return format_pf_non_streaming_response(
-            response, history_metadata, PROMPTFLOW_RESPONSE_FIELD_NAME, PROMPTFLOW_CITATIONS_FIELD_NAME
+            response,
+            history_metadata,
+            app_settings.promptflow.response_field_name,
+            app_settings.promptflow.citations_field_name
         )
     else:
         response, apim_request_id = await send_chat_request(request_body, request_headers)
@@ -971,7 +947,7 @@ async def stream_chat_request(request_body, request_headers):
 
 async def conversation_internal(request_body, request_headers):
     try:
-        if SHOULD_STREAM:
+        if app_settings.azure_openai.stream:
             result = await stream_chat_request(request_body, request_headers)
             response = await make_response(format_as_ndjson(result))
             response.timeout = None
@@ -1568,7 +1544,7 @@ async def clear_messages():
 
 @bp.route("/history/ensure", methods=["GET"])
 async def ensure_cosmos():
-    if not AZURE_COSMOSDB_ACCOUNT:
+    if not app_settings.chat_history:
         return jsonify({"error": "CosmosDB is not configured"}), 404
 
     try:
@@ -1590,7 +1566,7 @@ async def ensure_cosmos():
             return (
                 jsonify(
                     {
-                        "error": f"{cosmos_exception} {AZURE_COSMOSDB_DATABASE} for account {AZURE_COSMOSDB_ACCOUNT}"
+                        "error": f"{cosmos_exception} {app_settings.chat_history.database} for account {app_settings.chat_history.account}"
                     }
                 ),
                 422,
@@ -1599,7 +1575,7 @@ async def ensure_cosmos():
             return (
                 jsonify(
                     {
-                        "error": f"{cosmos_exception}: {AZURE_COSMOSDB_CONVERSATIONS_CONTAINER}"
+                        "error": f"{cosmos_exception}: {app_settings.chat_history.conversations_container}"
                     }
                 ),
                 422,
@@ -1621,7 +1597,7 @@ async def generate_title(conversation_messages):
     try:
         azure_openai_client = init_openai_client(use_data=False)
         response = await azure_openai_client.chat.completions.create(
-            model=AZURE_OPENAI_MODEL, messages=messages, temperature=1, max_tokens=64
+            model=app_settings.azure_openai.model, messages=messages, temperature=1, max_tokens=64
         )
 
         title = json.loads(response.choices[0].message.content)["title"]
