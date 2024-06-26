@@ -903,7 +903,8 @@ const Chat = () => {
                         role="user"
                         answer={{
                           answer: showAnalyzingMessage ? messageStatus.Analyzing : messageStatus.Uploading,
-                          citations: []
+                          citations: [],
+                          plotly_data: null
                         }}
                         onCitationClicked={() => null}
                       />

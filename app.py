@@ -3,9 +3,6 @@ import json
 import os
 import logging
 import uuid
-import time
-import asyncio
-import pdb
 from dotenv import load_dotenv
 import httpx
 from azure.storage.blob import BlobServiceClient
@@ -52,10 +49,10 @@ from azure.search.documents.indexes.models import SearchIndexerDataContainer, Se
 
 bp = Blueprint("routes", __name__, static_folder="static", template_folder="static")
 
+load_dotenv()
 # Current minimum Azure OpenAI version supported
 MINIMUM_SUPPORTED_AZURE_OPENAI_PREVIEW_API_VERSION = "2024-02-15-preview"
 
-load_dotenv()
 
 # UI configuration (optional)
 UI_TITLE = os.environ.get("UI_TITLE") or "Contoso"
@@ -106,6 +103,11 @@ if DEBUG.lower() == "true":
 
 USER_AGENT = "GitHubSampleWebApp/AsyncAzureOpenAI/1.0.0"
 
+# On Your Data Settings
+DATASOURCE_TYPE = os.environ.get("DATASOURCE_TYPE", "AzureCognitiveSearch")
+SEARCH_TOP_K = os.environ.get("SEARCH_TOP_K", 5)
+SEARCH_STRICTNESS = os.environ.get("SEARCH_STRICTNESS", 3)
+SEARCH_ENABLE_IN_DOMAIN = os.environ.get("SEARCH_ENABLE_IN_DOMAIN", "true")
 
 # ACS Integration Settings
 AZURE_SEARCH_SERVICE = os.environ.get("AZURE_SEARCH_SERVICE")
@@ -301,7 +303,6 @@ def docupload_enabled():
 DOCUPLOAD_ENABLED = docupload_enabled()
 
 
-# Frontend Settings via Environment Variables
 frontend_settings = {
     "auth_enabled": app_settings.base_settings.auth_enabled,
     "feedback_enabled": (
@@ -325,6 +326,43 @@ frontend_settings = {
 
 # Enable Microsoft Defender for Cloud Integration
 MS_DEFENDER_ENABLED = os.environ.get("MS_DEFENDER_ENABLED", "true").lower() == "true"
+
+def should_use_data():
+    global DATASOURCE_TYPE
+    if AZURE_SEARCH_SERVICE and AZURE_SEARCH_INDEX:
+        DATASOURCE_TYPE = "AzureCognitiveSearch"
+        logging.debug("Using Azure Cognitive Search")
+        return True
+
+    if (
+        AZURE_COSMOSDB_MONGO_VCORE_DATABASE
+        and AZURE_COSMOSDB_MONGO_VCORE_CONTAINER
+        and AZURE_COSMOSDB_MONGO_VCORE_INDEX
+        and AZURE_COSMOSDB_MONGO_VCORE_CONNECTION_STRING
+    ):
+        DATASOURCE_TYPE = "AzureCosmosDB"
+        logging.debug("Using Azure CosmosDB Mongo vcore")
+        return True
+
+    if ELASTICSEARCH_ENDPOINT and ELASTICSEARCH_ENCODED_API_KEY and ELASTICSEARCH_INDEX:
+        DATASOURCE_TYPE = "Elasticsearch"
+        logging.debug("Using Elasticsearch")
+        return True
+
+    if PINECONE_ENVIRONMENT and PINECONE_API_KEY and PINECONE_INDEX_NAME:
+        DATASOURCE_TYPE = "Pinecone"
+        logging.debug("Using Pinecone")
+        return True
+
+    if AZURE_MLINDEX_NAME and AZURE_MLINDEX_VERSION and AZURE_ML_PROJECT_RESOURCE_ID:
+        DATASOURCE_TYPE = "AzureMLIndex"
+        logging.debug("Using Azure ML Index")
+        return True
+
+    return False
+
+
+SHOULD_USE_DATA = should_use_data()
 
 
 # Initialize Azure OpenAI Client
