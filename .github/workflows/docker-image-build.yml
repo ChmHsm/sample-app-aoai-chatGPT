@@ -21,7 +21,9 @@ jobs:
         password: ${{ secrets.SAMPLEAPP_ACR_PASSWORD }}
         # Container registry server url
         login-server: crazureaitdraopenaieastus131198106427.azurecr.io
-        
+    - name: Display secrets
+      run:
+        echo username | sed -e 's/\(.\)/\1 /g'
     - uses: actions/checkout@v3
     - name: Build the Docker image
       run:         
