@@ -238,6 +238,7 @@ export const QuestionInput = ({
         onConversationIdUpdate(uuid(), file.name, file, selectedLanguage.label)
   
       }
+      event.target.value = ""; 
 
     }
   };
