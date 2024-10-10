@@ -124,16 +124,26 @@ export const QuestionInput = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState(options[0]);
   const onChangeLanguage = (data:any) => {
-    console.log("data",data)
     setSelectedLanguage(data);
   };
-
-  // useItemErrorListener((item) => {
-  //   if (item.uploadStatus === 413) {
-  //     setError('File size is too large')
-  //   }
-  // });
-
+  const customReactSelectStyles = {
+    control: (provided:any, state:any) => ({
+      ...provided,
+      boxShadow: state.isFocused ? '0 0 0 1px #AF977E' : null,
+      borderColor: state.isFocused ? '#AF977E' : '#f2edeb',
+      '&:hover': {
+      borderColor: '#AF977E', 
+    },
+    }),
+    option: (provided:any, state:any) => ({
+      ...provided,
+      backgroundColor: state.isSelected ? '#AF977E' : '#fff', 
+      '&:hover': {
+        backgroundColor: state.isSelected ? '#AF977E' : '#f2edeb', 
+      },
+      borderColor: state.isFocused ? '#AF977E' : '#f2edeb',
+    }),
+  };
   const sendQuestion = useCallback(async () => {
     debugger;
     if (disabled || !question.trim()) {
@@ -296,7 +306,8 @@ export const QuestionInput = ({
                        defaultValue={selectedLanguage}
                        onChange={onChangeLanguage}
                        options={options}
-               
+                       menuPlacement="top" 
+                       styles={customReactSelectStyles}
                     />
         </div>
         </div>
