@@ -1,8 +1,8 @@
-import { forwardRef, useCallback, useState, useContext } from 'react'
+import { forwardRef, useCallback, useState, useContext, useRef } from 'react'
 import { Stack, TextField } from '@fluentui/react'
-import { SendRegular, AttachRegular } from '@fluentui/react-icons'
+import { AttachRegular } from '@fluentui/react-icons'
+import Select from "react-select";
 
-import Send from '../../assets/Send.svg'
 
 import styles from './QuestionInput.module.css'
 import DocumentIcon from '../../assets/Document_Solutions_Duotone.svg'
@@ -22,7 +22,7 @@ interface Props {
   placeholder?: string
   clearOnSend?: boolean
   conversationId?: string
-  onConversationIdUpdate?: (newConversationId: string, filename: string, file:File) => void
+  onConversationIdUpdate?: (newConversationId: string, filename: string, file:File, language:string) => void
   onDocumentIndexing?: (isIndexing: boolean) => void
   onDocumentUploading?: (isUploading: boolean) => void
 }
@@ -43,19 +43,19 @@ const UploadSpinner: React.FC<UploadSpinnerProps> = ({
   const [uploading, setUploading] = useState(false)
   const [isSuccessfulUpload, setIsSuccessfulUpload] = useState(false)
 
-  useItemStartListener(item => {
+  useItemStartListener((item:any) => {
     onUploadStatusChange(true)
     setUploading(true)
     setIsSuccessfulUpload(false)
     setDocumentUploaded(false)
   })
 
-  useItemErrorListener(item => {
+  useItemErrorListener((item:any) => {
     setIsSuccessfulUpload(false)
     setUploading(false)
   })
 
-  useItemFinishListener(item => {
+  useItemFinishListener((item:any) => {
     if (item.uploadResponse && item.uploadStatus === 200) {
       if (item.uploadResponse.data.conversation_id) {
         onUploadStatusChange(false)
@@ -104,13 +104,46 @@ export const QuestionInput = ({
   const appStateContext = useContext(AppStateContext)
   const ui = appStateContext?.state.frontendSettings?.ui
   const DOCUPLOAD_MAX_SIZE_MB = appStateContext?.state.frontendSettings?.upload_max_filesize
-
-  // useItemErrorListener((item) => {
-  //   if (item.uploadStatus === 413) {
-  //     setError('File size is too large')
-  //   }
-  // });
-
+  const options = [
+    { label: "English", value: 'english' },
+    { label: "Arabic", value: 'arabic' },
+    { label: "Chinese (Mandarin", value: 'chinese' },
+    { label: "Spanish", value: 'spanish' },
+    { label: "French", value: 'french' },
+    { label: "Hindi", value: 'hindi' },
+    { label: "Russian", value: 'russian' },
+    { label: "Portuguese", value: 'portuguese' },
+    { label: "German", value: 'german' },
+    { label: "Japanese", value: 'japanese' },
+    { label: "Italian", value: 'italian' },
+    { label: "Korean", value: 'korean' },
+    { label: "Turkish", value: 'turkish' },
+    { label: "Urdu", value: 'urdu' },
+    { label: "Bengali", value: 'bengali' }
+    ];
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState(options[0]);
+  const onChangeLanguage = (data:any) => {
+    setSelectedLanguage(data);
+  };
+  const customReactSelectStyles = {
+    control: (provided:any, state:any) => ({
+      ...provided,
+      boxShadow: state.isFocused ? '0 0 0 1px #AF977E' : null,
+      borderColor: state.isFocused ? '#AF977E' : '#f2edeb',
+      '&:hover': {
+      borderColor: '#AF977E', 
+    },
+    }),
+    option: (provided:any, state:any) => ({
+      ...provided,
+      backgroundColor: state.isSelected ? '#AF977E' : '#fff', 
+      '&:hover': {
+        backgroundColor: state.isSelected ? '#AF977E' : '#f2edeb', 
+      },
+      borderColor: state.isFocused ? '#AF977E' : '#f2edeb',
+    }),
+  };
   const sendQuestion = useCallback(async () => {
     debugger;
     if (disabled || !question.trim()) {
@@ -147,9 +180,9 @@ export const QuestionInput = ({
   }, [disabled, question, clearOnSend, indexId, onDocumentIndexing, conversationId, onSend])
 
   const handleUploadSuccess = useCallback(
-    (newConversationId: string, uniqueId: string, filename: string, file:File) => {
+    (newConversationId: string, uniqueId: string, filename: string, file:File, language:string) => {
       if (onConversationIdUpdate && newConversationId !== null) {
-        onConversationIdUpdate(newConversationId, filename, file)
+        onConversationIdUpdate(newConversationId, filename, file, language)
         setIndexId(uniqueId)
       }
     },
@@ -208,17 +241,21 @@ export const QuestionInput = ({
   )
 
   const handleFileChange = (event:any) => {
+    debugger;
     const file = event.target.files[0];
-    if (file) {
-      console.log(file);
+    if (file) {      
       if (onConversationIdUpdate) {
-        onConversationIdUpdate(uuid(), file.name, file)
+        onConversationIdUpdate(uuid(), file.name, file, selectedLanguage.label)
   
       }
+      event.target.value = ""; 
 
     }
   };
 
+  const handleUploadButtonClick = () => {
+    fileInputRef.current?.click();
+  }
   return (
     // <Uploady destination={uploadDestination} fileFilter={fileSizeOk} params={{ conversationId: conversationId }}>
     //     <Stack horizontal className={styles.questionInputContainer}>
@@ -259,19 +296,36 @@ export const QuestionInput = ({
     //     </Stack>
     // </Uploady>
     <Stack horizontal className={styles.questionInputContainer}>
-    <TextField
-      className={styles.questionInputTextArea}
-      placeholder="Type your question here"
-      multiline
-      resizable={false}
-      borderless
-      value={question}
-      onChange={onQuestionChange}
-      onKeyDown={onEnterPress}
-    />
+      <div>
+        <div>
+        <label className={styles.label}>
+          Select a Language:
+        </label>
+        <div className={styles.dropDownContainer}>
+                    <Select
+                       defaultValue={selectedLanguage}
+                       onChange={onChangeLanguage}
+                       options={options}
+                       menuPlacement="top" 
+                       styles={customReactSelectStyles}
+                    />
+        </div>
+        </div>
+      </div>
+
     <Stack horizontal className={styles.questionInputActionsContainer}>
-      <input type="file" onChange={handleFileChange} />
-      {error && <span className={styles.error}>{error}</span>}
+      <div>
+      <button type="button" onClick={handleUploadButtonClick} className={styles.uploadBtn}>
+        Upload your screenshot
+      </button>
+      <input
+        type="file"
+        ref={fileInputRef}
+        style={{ display: "none" }}
+        onChange={handleFileChange}
+      />
+    </div>
+      {/* {error && <span className={styles.error}>{error}</span>}
       <div
         className={styles.questionInputSendButtonContainer}
         role="button"
@@ -280,12 +334,7 @@ export const QuestionInput = ({
         onClick={sendQuestion}
         onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ' ? sendQuestion() : null)}
       >
-        {sendQuestionDisabled ? (
-          <SendRegular className={styles.questionInputSendButtonDisabled} />
-        ) : (
-          <img src={Send} className={styles.questionInputSendButton} />
-        )}
-      </div>
+      </div> */}
     </Stack>
   </Stack>
   )

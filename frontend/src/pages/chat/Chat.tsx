@@ -163,7 +163,7 @@ const Chat = () => {
     abortFuncs.current.unshift(abortController)
 
 
-    let userMessage: ChatMessage;
+    let userMessage: any;
     if(typeof question !== 'string') {
        userMessage = question
     } else {
@@ -180,7 +180,7 @@ const Chat = () => {
       conversation = {
         id: conversationId ?? uuid(),
         title: question,
-        messages: [userMessage],
+        messages: userMessage,
         date: new Date().toISOString()
       }
     } else {
@@ -194,14 +194,14 @@ const Chat = () => {
         conversation = {
           id: conversationId ?? uuid(),
           title: question,
-          messages: [userMessage],
+          messages: userMessage,
           date: new Date().toISOString()
         }
         if(typeof question === 'string') { 
-          conversation.messages.push(userMessage)
+          conversation.messages = [...conversation.messages, ...userMessage]
         }
         } else {
-          conversation.messages.push(userMessage)
+          conversation.messages = [...conversation.messages, ...userMessage]
       }
     }
 
@@ -626,7 +626,7 @@ const Chat = () => {
   };
   
 
-  const handleConversationIdUpdate = async (conversationId: string, filename: string, file:File) => {
+  const handleConversationIdUpdate = async (conversationId: string, filename: string, file:File, language:string) => {
     debugger;
     // Update the application state/context to switch to the new conversation
     appStateContext?.dispatch({
@@ -656,6 +656,12 @@ const Chat = () => {
 
     let uploadMessages = [
       { id: uuid().toString(), role: 'user', content: base64File, date: today, type:'img', imgUrl:imgUrl },
+      {
+        id: uuid().toString(),
+        role: 'user',
+        content: `Analyze and Reply in ${language}`,
+        date: today
+      }
       // {
       //   id: uuid().toString(),
       //   role: 'assistant',
@@ -681,7 +687,7 @@ const Chat = () => {
         }
       })
     }
-    makeApiRequestWithoutCosmosDB(uploadMessages[0], conversationId)
+    makeApiRequestWithoutCosmosDB(uploadMessages, conversationId)
     setProcessMessages(messageStatus.Done)
   }
 
@@ -867,9 +873,10 @@ const Chat = () => {
                     {answer.role === 'user' ? (
                       <div className={styles.chatMessageUser} tabIndex={0}>
                       {
-                        answer?.type && answer.type === 'img' ? <img className={styles.chatImg} src={answer.imgUrl} /> : 
-                        <div className={styles.chatMessageUserMessage}>{answer.content}</div>
+                        answer?.type && answer.type === 'img' && <img className={styles.chatImg} src={answer.imgUrl} />  
                       }
+                        {/* <div className={styles.chatMessageUserMessage}>{answer.content}</div> */}
+
                       </div>
                     ) : answer.role === 'assistant' ? (
                       <div className={styles.chatMessageGpt}>
@@ -945,8 +952,8 @@ const Chat = () => {
                   </span>
                 </Stack>
               )}
-              <Stack>
-                {appStateContext?.state.isCosmosDBAvailable?.status !== CosmosDBStatus.NotConfigured && (
+              {/* <Stack> */}
+                {/* {appStateContext?.state.isCosmosDBAvailable?.status !== CosmosDBStatus.NotConfigured && (
                   <CommandBarButton
                     role="button"
                     styles={{
@@ -971,9 +978,9 @@ const Chat = () => {
                     disabled={disabledButton()}
                     aria-label="start a new chat button"
                   />
-                )}
+                )} */}
                 
-                <CommandBarButton
+                {/* <CommandBarButton
                   role="button"
                   styles={{
                     icon: {
@@ -1004,14 +1011,14 @@ const Chat = () => {
                   }
                   disabled={disabledButton()}
                   aria-label="clear chat button"
-                />
-                <Dialog
+                /> */}
+                {/* <Dialog
                   hidden={hideErrorDialog}
                   onDismiss={handleErrorDialogClose}
                   dialogContentProps={errorDialogContentProps}
                   modalProps={modalProps}></Dialog>
-              </Stack>
-              <CommandBarButton
+              </Stack> */}
+              {/* <CommandBarButton
                   role="button"
                   styles={{
                     icon: {
@@ -1042,7 +1049,7 @@ const Chat = () => {
                   }
                   disabled={disabledButton()}
                   aria-label="clear chat button"
-                />
+                /> */}
               <QuestionInput
                 clearOnSend
                 placeholder="Type or attach you message..."
