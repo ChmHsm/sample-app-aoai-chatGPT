@@ -952,7 +952,7 @@ const Chat = () => {
                   </span>
                 </Stack>
               )}
-              <Stack>
+              {/* <Stack> */}
                 {/* {appStateContext?.state.isCosmosDBAvailable?.status !== CosmosDBStatus.NotConfigured && (
                   <CommandBarButton
                     role="button"
@@ -1012,12 +1012,12 @@ const Chat = () => {
                   disabled={disabledButton()}
                   aria-label="clear chat button"
                 /> */}
-                <Dialog
+                {/* <Dialog
                   hidden={hideErrorDialog}
                   onDismiss={handleErrorDialogClose}
                   dialogContentProps={errorDialogContentProps}
                   modalProps={modalProps}></Dialog>
-              </Stack>
+              </Stack> */}
               {/* <CommandBarButton
                   role="button"
                   styles={{
